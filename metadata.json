@@ -1,0 +1,6 @@
+{
+  "name": "LMS Multi-Role Dashboard",
+  "description": "Comprehensive LMS Analytics platform with multi-role dashboards for Admin, Manager/Atasan, and Trainer/Instructor with advanced interactive metrics, progress heatmaps, and course performance analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
