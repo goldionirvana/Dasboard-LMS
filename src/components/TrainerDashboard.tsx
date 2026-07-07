@@ -50,9 +50,10 @@ import {
 
 interface TrainerDashboardProps {
   filters: FilterState;
+  onViewKHS?: (employeeName: string) => void;
 }
 
-export default function TrainerDashboard({ filters }: TrainerDashboardProps) {
+export default function TrainerDashboard({ filters, onViewKHS }: TrainerDashboardProps) {
   const [selectedClassFilters, setSelectedClassFilters] = useState<string>('all');
   const PASSING_GRADE = 75;
 
@@ -311,7 +312,14 @@ export default function TrainerDashboard({ filters }: TrainerDashboardProps) {
             {progressPesertaList.map(peserta => (
               <div key={peserta.id} className="p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <div className="space-y-1">
-                  <div className="font-semibold text-slate-800 text-sm">{peserta.name}</div>
+                  <div>
+                    <button
+                      onClick={() => onViewKHS && onViewKHS(peserta.name)}
+                      className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left cursor-pointer transition-all text-sm focus:outline-hidden"
+                    >
+                      {peserta.name}
+                    </button>
+                  </div>
                   <div className="text-xs text-slate-500">{peserta.courseTitle}</div>
                 </div>
                 
@@ -419,7 +427,14 @@ export default function TrainerDashboard({ filters }: TrainerDashboardProps) {
                 ) : (
                   failedParticipants.map(item => (
                     <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3 font-semibold text-slate-850">{item.name}</td>
+                      <td className="py-3">
+                        <button
+                          onClick={() => onViewKHS && onViewKHS(item.name)}
+                          className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left cursor-pointer transition-all focus:outline-hidden"
+                        >
+                          {item.name}
+                        </button>
+                      </td>
                       <td className="py-3 text-slate-650">{item.course}</td>
                       <td className="py-3 font-mono font-bold text-rose-600">{item.quizScore}</td>
                       <td className="py-3 font-mono text-slate-500">{item.passingGrade}</td>
@@ -452,7 +467,14 @@ export default function TrainerDashboard({ filters }: TrainerDashboardProps) {
               neverLoggedInParticipants.map(user => (
                 <div key={user.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
                   <div>
-                    <div className="font-semibold text-xs text-slate-800">{user.name}</div>
+                    <div>
+                      <button
+                        onClick={() => onViewKHS && onViewKHS(user.name)}
+                        className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left cursor-pointer transition-all text-xs focus:outline-hidden"
+                      >
+                        {user.name}
+                      </button>
+                    </div>
                     <div className="text-[10px] text-slate-400">{user.division} • {user.regional} • Admin Created: {user.dateCreated}</div>
                   </div>
                   <button 
@@ -514,7 +536,14 @@ export default function TrainerDashboard({ filters }: TrainerDashboardProps) {
             <tbody className="divide-y divide-slate-100">
               {lgiList.map(item => (
                 <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="py-3.5 px-4 font-semibold text-slate-800">{item.userName}</td>
+                  <td className="py-3.5 px-4 font-semibold text-slate-800">
+                    <button
+                      onClick={() => onViewKHS && onViewKHS(item.userName)}
+                      className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left cursor-pointer transition-all focus:outline-hidden"
+                    >
+                      {item.userName}
+                    </button>
+                  </td>
                   <td className="py-3.5 px-4 text-slate-500">{item.className}</td>
                   <td className="py-3.5 px-4 text-center font-mono text-[#475569]">{item.preTest}</td>
                   <td className="py-3.5 px-4 text-center font-mono text-slate-800 font-semibold">{item.postTest}</td>

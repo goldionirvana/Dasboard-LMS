@@ -35,9 +35,10 @@ import { mockUsers, mockCourses, mockEnrollments } from '../data';
 
 interface ManagerDashboardProps {
   filters: FilterState;
+  onViewKHS?: (employeeName: string) => void;
 }
 
-export default function ManagerDashboard({ filters }: ManagerDashboardProps) {
+export default function ManagerDashboard({ filters, onViewKHS }: ManagerDashboardProps) {
 
   // 1. TIM IDENTIFICATION
   // As a Manager, let's assume are responsible for a subset of members depending on the filter selections.
@@ -369,7 +370,14 @@ export default function ManagerDashboard({ filters }: ManagerDashboardProps) {
               <tbody className="divide-y divide-slate-50">
                 {teamProgressTable.map(member => (
                   <tr key={member.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-3.5 font-medium text-slate-900">{member.name}</td>
+                    <td className="py-3.5 font-medium text-slate-900">
+                      <button
+                        onClick={() => onViewKHS && onViewKHS(member.name)}
+                        className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left cursor-pointer transition-all focus:outline-hidden"
+                      >
+                        {member.name}
+                      </button>
+                    </td>
                     <td className="py-3.5 text-slate-500">{member.role} ({member.division})</td>
                     <td className="py-3.5">
                       <div className="flex items-center gap-2 max-w-44">
@@ -480,7 +488,14 @@ export default function ManagerDashboard({ filters }: ManagerDashboardProps) {
                 ) : (
                   overdueMembersList.map(member => (
                     <tr key={member.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3 font-medium text-slate-900">{member.name}</td>
+                      <td className="py-3 font-medium text-slate-900">
+                        <button
+                          onClick={() => onViewKHS && onViewKHS(member.name)}
+                          className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left cursor-pointer transition-all focus:outline-hidden"
+                        >
+                          {member.name}
+                        </button>
+                      </td>
                       <td className="py-3 text-slate-600">{member.courseTitle}</td>
                       <td className="py-3 font-mono text-slate-500">{member.deadline}</td>
                       <td className="py-3 text-right">

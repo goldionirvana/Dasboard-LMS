@@ -24,7 +24,8 @@ import {
   Building,
   Target,
   ArrowDownRight,
-  ShieldCheck
+  ShieldCheck,
+  Compass
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -55,13 +56,15 @@ import {
   getCompletionsMonthly,
   getDailyLogins
 } from '../data';
+import SOCDashboard from './SOCDashboard';
 
 interface AdminDashboardProps {
   filters: FilterState;
+  onViewKHS?: (employeeName: string) => void;
 }
 
-export default function AdminDashboard({ filters }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'monitoring'>('overview');
+export default function AdminDashboard({ filters, onViewKHS }: AdminDashboardProps) {
+  const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'monitoring' | 'program_review'>('overview');
   const [activeUserTimeframe, setActiveUserTimeframe] = useState<'harian' | 'mingguan' | 'bulanan'>('bulanan');
   const [searchQuery, setSearchQuery] = useState('');
   const [newUserTimeframe, setNewUserTimeframe] = useState<7 | 30>(30);
@@ -328,6 +331,18 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
         >
           <Users className="w-4 h-4" />
           <span>Pengawasan Belajar (Learners)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('program_review')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+            activeTab === 'program_review'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <Compass className="w-4 h-4" />
+          <span>Analisis Program Berjalan</span>
         </button>
       </div>
 
@@ -672,7 +687,12 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
                     </td>
                     <td className="py-3">
                       <div>
-                        <div className="font-medium text-slate-800">{learner.name}</div>
+                        <button 
+                          onClick={() => onViewKHS && onViewKHS(learner.name)} 
+                          className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left cursor-pointer transition-all focus:outline-hidden"
+                        >
+                          {learner.name}
+                        </button>
                         <div className="text-[10px] text-slate-400">{learner.division} • {learner.regional}</div>
                       </div>
                     </td>
@@ -710,7 +730,14 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
               lowProgressUsers.map(enroll => (
                 <div key={enroll.id} className="p-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3 hover:bg-slate-50 transition-colors">
                   <div className="space-y-1">
-                    <div className="font-medium text-slate-800 text-sm">{enroll.userName}</div>
+                    <div>
+                      <button 
+                        onClick={() => onViewKHS && onViewKHS(enroll.userName)} 
+                        className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left cursor-pointer text-sm transition-all focus:outline-hidden"
+                      >
+                        {enroll.userName}
+                      </button>
+                    </div>
                     <div className="text-xs text-slate-500 font-medium">
                       Modul: <span className="text-slate-700">{enroll.courseTitle}</span>
                     </div>
@@ -771,7 +798,14 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
               newUsers.map(user => (
                 <div key={user.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
                   <div>
-                    <div className="font-medium text-slate-800">{user.name}</div>
+                    <div>
+                      <button 
+                        onClick={() => onViewKHS && onViewKHS(user.name)} 
+                        className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left cursor-pointer transition-all focus:outline-hidden"
+                      >
+                        {user.name}
+                      </button>
+                    </div>
                     <div className="text-xs text-slate-400">{user.division} • {user.regional} • {user.role}</div>
                   </div>
                   <div className="text-right">
@@ -1138,6 +1172,12 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
           ))}
         </div>
       </div>
+      )}
+
+      {activeTab === 'program_review' && (
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm" id="admin-program-review-container">
+          <SOCDashboard onViewKHS={onViewKHS} />
+        </div>
       )}
 
     </div>

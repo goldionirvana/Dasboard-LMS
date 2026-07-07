@@ -26,9 +26,11 @@ import { DashboardRole, FilterState } from './types';
 import AdminDashboard from './components/AdminDashboard';
 import ManagerDashboard from './components/ManagerDashboard';
 import TrainerDashboard from './components/TrainerDashboard';
+import KHSDashboard from './components/KHSDashboard';
 
 export default function App() {
   const [activeRole, setActiveRole] = useState<DashboardRole>('admin');
+  const [selectedKHSName, setSelectedKHSName] = useState<string | null>(null);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
   
   // Initialize filter state with Indonesia-oriented defaults
@@ -102,7 +104,9 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6" id="dashboard-scaffold">
         
-        {/* 🏆 HERO HEADER BANNER */}
+        {!selectedKHSName && (
+          <>
+            {/* 🏆 HERO HEADER BANNER */}
         <div className="p-6 md:p-8 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4 relative overflow-hidden" id="dashboard-hero-card">
           {/* Subtle graphic accent */}
           <div className="absolute right-0 bottom-0 opacity-5 pointer-events-none transform translate-y-12 translate-x-4">
@@ -336,12 +340,23 @@ export default function App() {
             )}
           </div>
         </div>
+          </>
+        )}
 
         {/* 🚀 ACTIVE DASHBOARD MOUNTING POINT */}
         <div id="active-dashboard-mount-point" className="transition-all duration-350">
-          {activeRole === 'admin' && <AdminDashboard filters={filters} />}
-          {activeRole === 'manager' && <ManagerDashboard filters={filters} />}
-          {activeRole === 'trainer' && <TrainerDashboard filters={filters} />}
+          {selectedKHSName ? (
+            <KHSDashboard 
+              initialEmployeeName={selectedKHSName} 
+              onBack={() => setSelectedKHSName(null)} 
+            />
+          ) : (
+            <>
+              {activeRole === 'admin' && <AdminDashboard filters={filters} onViewKHS={setSelectedKHSName} />}
+              {activeRole === 'manager' && <ManagerDashboard filters={filters} onViewKHS={setSelectedKHSName} />}
+              {activeRole === 'trainer' && <TrainerDashboard filters={filters} onViewKHS={setSelectedKHSName} />}
+            </>
+          )}
         </div>
 
       </main>
