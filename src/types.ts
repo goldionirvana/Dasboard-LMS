@@ -8,9 +8,8 @@ export interface User {
   name: string;
   email: string;
   division: 'Kitchen' | 'Service' | 'Warehouse' | 'Management';
-  branch: 'Malang' | 'Garut' | 'Bandung';
-  area: 'Area Barat' | 'Area Timur';
-  regional: 'Regional Jawa' | 'Regional Bali';
+  area: 'East' | 'West';
+  regional: 'Jabar 1' | 'Jabar 2' | 'Jatim 1' | 'Jatim 2' | 'Kalimantan 1';
   role: string;
   dateCreated: string;
   lastLogin: string | null; // Null means "Belum Pernah Login"
@@ -33,7 +32,8 @@ export interface Enrollment {
   userId: string;
   userName: string;
   userDivision: string;
-  userBranch: string;
+  userArea: 'East' | 'West';
+  userRegional: 'Jabar 1' | 'Jabar 2' | 'Jatim 1' | 'Jatim 2' | 'Kalimantan 1';
   courseId: string;
   courseTitle: string;
   progress: number; // 0 - 100%
@@ -78,7 +78,8 @@ export interface TeamMember {
   id: string;
   name: string;
   division: string;
-  branch: string;
+  area: 'East' | 'West';
+  regional: 'Jabar 1' | 'Jabar 2' | 'Jatim 1' | 'Jatim 2' | 'Kalimantan 1';
   progress: number;
   status: 'Not Started' | 'In Progress' | 'Completed' | 'Overdue';
   quizScore: number;
@@ -90,9 +91,8 @@ export type DashboardRole = 'admin' | 'manager' | 'trainer';
 
 export interface FilterState {
   periode: 'all' | 'today' | '7days' | '30days';
-  branch: 'all' | 'Malang' | 'Garut' | 'Bandung';
-  area: 'all' | 'Area Barat' | 'Area Timur';
-  regional: 'all' | 'Regional Jawa' | 'Regional Bali';
+  area: 'all' | 'East' | 'West';
+  regional: 'all' | 'Jabar 1' | 'Jabar 2' | 'Jatim 1' | 'Jatim 2' | 'Kalimantan 1';
   division: 'all' | 'Kitchen' | 'Service' | 'Warehouse' | 'Management';
   category: 'all' | 'Food Safety' | 'Leadership' | 'SOP' | 'Service Excellence';
 }

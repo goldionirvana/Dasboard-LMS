@@ -60,7 +60,8 @@ export default function TrainerDashboard({ filters }: TrainerDashboardProps) {
   const trainerParticipants = useMemo(() => {
     return mockUsers.filter(u => {
       if (u.id === 'u4') return false; // Exclude top manager
-      if (filters.branch !== 'all' && u.branch !== filters.branch) return false;
+      if (filters.area !== 'all' && u.area !== filters.area) return false;
+      if (filters.regional !== 'all' && u.regional !== filters.regional) return false;
       if (filters.division !== 'all' && u.division !== filters.division) return false;
       return true;
     });
@@ -86,8 +87,8 @@ export default function TrainerDashboard({ filters }: TrainerDashboardProps) {
   const totalClasses = useMemo(() => {
     // Dynamically check how many core courses or locations are mapped
     const coursesCount = filters.category === 'all' ? 4 : 1;
-    const branchesCount = filters.branch === 'all' ? 3 : 1;
-    return coursesCount * branchesCount;
+    const regionalsCount = filters.regional === 'all' ? (filters.area === 'all' ? 5 : 2) : 1;
+    return coursesCount * regionalsCount;
   }, [filters]);
 
   const trainerCompletionRate = useMemo(() => {
@@ -452,7 +453,7 @@ export default function TrainerDashboard({ filters }: TrainerDashboardProps) {
                 <div key={user.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
                   <div>
                     <div className="font-semibold text-xs text-slate-800">{user.name}</div>
-                    <div className="text-[10px] text-slate-400">{user.division} • {user.branch} • Admin Created: {user.dateCreated}</div>
+                    <div className="text-[10px] text-slate-400">{user.division} • {user.regional} • Admin Created: {user.dateCreated}</div>
                   </div>
                   <button 
                     onClick={() => alert(`Mengirim instruksi credential login baru ke ${user.email}`)}

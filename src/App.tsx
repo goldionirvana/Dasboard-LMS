@@ -34,7 +34,6 @@ export default function App() {
   // Initialize filter state with Indonesia-oriented defaults
   const [filters, setFilters] = useState<FilterState>({
     periode: 'all',
-    branch: 'all',
     area: 'all',
     regional: 'all',
     division: 'all',
@@ -51,7 +50,6 @@ export default function App() {
   const resetFilters = () => {
     setFilters({
       periode: 'all',
-      branch: 'all',
       area: 'all',
       regional: 'all',
       division: 'all',
@@ -239,26 +237,10 @@ export default function App() {
               </div>
 
               {/* Cabang */}
-              <div className="space-y-1.5" id="field-cabang">
-                <label className="text-xs font-mono font-bold text-slate-400 uppercase flex items-center gap-1">
-                  <Building className="w-3.5 h-3.5 text-slate-400" /> Cabang Kerja
-                </label>
-                <select
-                  value={filters.branch}
-                  onChange={(e) => handleFilterChange('branch', e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500 focus:outline-hidden transition-all text-slate-700"
-                >
-                  <option value="all">Semua Cabang (All Branches)</option>
-                  <option value="Malang">Malang (Area Timur)</option>
-                  <option value="Garut">Garut (Area Barat)</option>
-                  <option value="Bandung">Bandung (Area Barat)</option>
-                </select>
-              </div>
-
               {/* Area */}
               <div className="space-y-1.5" id="field-area">
                 <label className="text-xs font-mono font-bold text-slate-400 uppercase flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400" /> Teritorial Area
+                  <MapPin className="w-3.5 h-3.5 text-slate-400" /> Area
                 </label>
                 <select
                   value={filters.area}
@@ -266,15 +248,15 @@ export default function App() {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500 focus:outline-hidden transition-all text-slate-700"
                 >
                   <option value="all">Semua Area (All Areas)</option>
-                  <option value="Area Barat">Area Barat (Garut &amp; Bandung)</option>
-                  <option value="Area Timur">Area Timur (Malang)</option>
+                  <option value="East">East</option>
+                  <option value="West">West</option>
                 </select>
               </div>
 
               {/* Regional */}
               <div className="space-y-1.5" id="field-regional">
                 <label className="text-xs font-mono font-bold text-slate-400 uppercase flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400" /> Regional Teritorial
+                  <MapPin className="w-3.5 h-3.5 text-slate-400" /> Regional
                 </label>
                 <select
                   value={filters.regional}
@@ -282,8 +264,11 @@ export default function App() {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500 focus:outline-hidden transition-all text-slate-700"
                 >
                   <option value="all">Semua Regional (All Regionals)</option>
-                  <option value="Regional Jawa">Regional Jawa</option>
-                  <option value="Regional Bali">Regional Bali</option>
+                  <option value="Jabar 1">Jabar 1</option>
+                  <option value="Jabar 2">Jabar 2</option>
+                  <option value="Jatim 1">Jatim 1</option>
+                  <option value="Jatim 2">Jatim 2</option>
+                  <option value="Kalimantan 1">Kalimantan 1</option>
                 </select>
               </div>
 

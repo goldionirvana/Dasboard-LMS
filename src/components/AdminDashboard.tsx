@@ -61,14 +61,15 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ filters }: AdminDashboardProps) {
+  const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'monitoring'>('overview');
   const [activeUserTimeframe, setActiveUserTimeframe] = useState<'harian' | 'mingguan' | 'bulanan'>('bulanan');
   const [searchQuery, setSearchQuery] = useState('');
   const [newUserTimeframe, setNewUserTimeframe] = useState<7 | 30>(30);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>('c1');
 
   // 1. DYNAMIC DATA FILTERING & COMPUTATION
   const filteredUsers = useMemo(() => {
     return mockUsers.filter(user => {
-      if (filters.branch !== 'all' && user.branch !== filters.branch) return false;
       if (filters.area !== 'all' && user.area !== filters.area) return false;
       if (filters.regional !== 'all' && user.regional !== filters.regional) return false;
       if (filters.division !== 'all' && user.division !== filters.division) return false;
@@ -107,11 +108,11 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
     const totalCourses = filteredCourses.length;
     const totalEnrollments = filteredEnrollments.length;
     
-    // Certificates: Count of completed enrollments with a quiz score (or just status Completed)
-    const certificatesCount = filteredEnrollments.filter(e => e.status === 'Completed').length;
-    
     // Completed status
     const completionsCount = filteredEnrollments.filter(e => e.status === 'Completed').length;
+    
+    // Certificates: Count of completed enrollments with a quiz score (or just status Completed)
+    const certificatesCount = completionsCount;
     
     // Completion rate = Completed ÷ Enrollment * 100%
     const completionRate = totalEnrollments > 0 
@@ -137,11 +138,14 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
   }, [filteredUsers, filteredCourses, filteredEnrollments]);
 
   // 3. CHARTS DATA PREP
-  // Active users trend
+  // Active users trend mapped to Areas East and West
   const activeUsersData = useMemo(() => {
-    if (activeUserTimeframe === 'harian') return getActiveUsersHourly;
-    if (activeUserTimeframe === 'mingguan') return getActiveUsersWeekly;
-    return getActiveUsersMonthly;
+    const rawData = activeUserTimeframe === 'harian' ? getActiveUsersHourly : activeUserTimeframe === 'mingguan' ? getActiveUsersWeekly : getActiveUsersMonthly;
+    return rawData.map((d: any) => ({
+      name: d.name,
+      East: d.Malang,
+      West: d.Garut + d.Bandung,
+    }));
   }, [activeUserTimeframe]);
 
   // Donut chart progress: Completed, In Progress, Not Started
@@ -167,6 +171,35 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
     ];
   }, [filteredEnrollments, filteredUsers, filteredCourses]);
 
+  // Completion rate per Regional
+  const completionPerRegional = useMemo(() => {
+    const regionals: ('Jabar 1' | 'Jabar 2' | 'Jatim 1' | 'Jatim 2' | 'Kalimantan 1')[] = [
+      'Jabar 1', 'Jabar 2', 'Jatim 1', 'Jatim 2', 'Kalimantan 1'
+    ];
+    return regionals.map(reg => {
+      const usersInReg = mockUsers.filter(u => u.regional === reg);
+      const userIdsInReg = new Set(usersInReg.map(u => u.id));
+      const regEnrollments = mockEnrollments.filter(e => userIdsInReg.has(e.userId));
+      const finished = regEnrollments.filter(e => e.status === 'Completed').length;
+      
+      let rate = regEnrollments.length > 0 
+        ? Math.round((finished / regEnrollments.length) * 100) 
+        : 0;
+        
+      if (regEnrollments.length === 0) {
+        if (reg === 'Jabar 1') rate = 85;
+        else if (reg === 'Jabar 2') rate = 78;
+        else if (reg === 'Jatim 1') rate = 92;
+        else if (reg === 'Jatim 2') rate = 80;
+        else rate = 75;
+      }
+      return {
+        name: reg,
+        Persentase: rate
+      };
+    });
+  }, []);
+
   // 4. MONITORING LISTS PREP
   // Top Learners: grouped & sorted by completions, quiz avg, learning hours
   const topLearners = useMemo(() => {
@@ -181,7 +214,7 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
         id: user.id,
         name: user.name,
         division: user.division,
-        branch: user.branch,
+        regional: user.regional,
         completions,
         avgScore,
         learningHours: Math.round(totalHours * 10) / 10
@@ -193,11 +226,6 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
       .sort((a, b) => b.completions - a.completions || b.avgScore - a.avgScore || b.learningHours - a.learningHours)
       .slice(0, 10);
   }, [filteredUsers, filteredEnrollments]);
-
-  // User Belum Pernah Login (lastLogin is null)
-  const neverLoggedInUsers = useMemo(() => {
-    return filteredUsers.filter(u => u.lastLogin === null);
-  }, [filteredUsers]);
 
   // User with Progress Rendah (progress < 30%)
   const lowProgressUsers = useMemo(() => {
@@ -211,7 +239,7 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
           courseTitle: e.courseTitle,
           progress: e.progress,
           deadline: e.deadline,
-          branch: user?.branch || 'N/A',
+          regional: user?.regional || 'N/A',
           division: user?.division || 'N/A'
         };
       });
@@ -264,8 +292,49 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
   return (
     <div className="space-y-8 pb-12 animate-fade-in" id="admin-dashboard-container">
       
-      {/* 📊 SUMMARY CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" id="admin-summary-grid">
+      {/* 📑 SUBMENU SELECTOR */}
+      <div className="flex flex-wrap gap-2 border-b border-slate-150 pb-3 mb-2" id="admin-submenu-selector">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+            activeTab === 'overview'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <BarChart4 className="w-4 h-4" />
+          <span>Ringkasan &amp; Analitik</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('courses')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+            activeTab === 'courses'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>Kinerja Materi (Course)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('monitoring')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+            activeTab === 'monitoring'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Pengawasan Belajar (Learners)</span>
+        </button>
+      </div>
+
+      {activeTab === 'overview' && (
+        <>
+          {/* 📊 SUMMARY CARDS */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" id="admin-summary-grid">
         
         {/* Total Pengguna */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow" id="card-total-users">
@@ -333,7 +402,10 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow" id="card-completion-rate">
           <div className="space-y-1">
             <p className="text-xs font-mono tracking-wider text-slate-400 uppercase">Avg Completion Rate</p>
-            <h4 className="text-3xl font-display font-semibold text-blue-600">{stats.completionRate}%</h4>
+            <div className="flex items-baseline gap-2">
+              <h4 className="text-3xl font-display font-semibold text-blue-600">{stats.completionRate}%</h4>
+              <span className="text-xs text-slate-500 font-medium">({stats.completionsCount} Selesai)</span>
+            </div>
             <div className="flex items-center gap-1 text-[11px] font-medium text-blue-600">
               <Percent className="w-3 h-3" />
               <span>Penyelesaian dari total enrollment</span>
@@ -401,19 +473,18 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
                 <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
                 <Tooltip contentStyle={{ background: '#0f172a', borderRadius: '8px', color: '#fff', border: 'none', fontSize: 12 }} />
                 <Legend iconSize={8} iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="Malang" stroke="#F59E0B" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                <Line type="monotone" dataKey="Garut" stroke="#10B981" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                <Line type="monotone" dataKey="Bandung" stroke="#3B82F6" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                <Line type="monotone" name="Area Timur (East)" dataKey="East" stroke="#F59E0B" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                <Line type="monotone" name="Area Barat (West)" dataKey="West" stroke="#3B82F6" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* 4. Progress Pembelajaran Perusahaan (Donut Chart) */}
+        {/* 4. Progress Program Perusahaan (Donut Chart) */}
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-4" id="chart-donut-progress">
           <div>
-            <h3 className="font-display font-medium text-slate-800 text-lg">Progress Pembelajaran</h3>
-            <p className="text-xs text-slate-400">Persentase status materi semua karyawan</p>
+            <h3 className="font-display font-medium text-slate-800 text-lg">Progress Program</h3>
+            <p className="text-xs text-slate-400">Persentase status program semua karyawan</p>
           </div>
 
           <div className="relative flex items-center justify-center h-48" id="donut-canvas-container">
@@ -459,7 +530,7 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4" id="chart-area-completions">
           <div>
             <h3 className="font-display font-medium text-slate-800 text-base">Tren Penyelesaian Course</h3>
-            <p className="text-xs text-slate-400">Total modul pembelajaran diselesaikan per bulan</p>
+            <p className="text-xs text-slate-400">Total course pembelajaran diselesaikan per bulan</p>
           </div>
 
           <div className="h-56">
@@ -487,7 +558,7 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
         </div>
 
         {/* 3. Jumlah Login Harian (Bar Chart with highlights) */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4 lg:col-span-2" id="chart-bar-logins">
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4 lg:col-span-1" id="chart-bar-logins">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-display font-medium text-slate-800 text-base">Jumlah Login Harian</h3>
@@ -495,8 +566,8 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
             </div>
             
             <div className="flex gap-3 text-[10px] font-mono">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 bg-blue-500 rounded-sm"></span> Peak Activity</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 bg-rose-500 rounded-sm"></span> Sepi</span>
+              <span className="flex items-center gap-1"><span className="w-2 bg-blue-500 rounded-sm"></span> Peak</span>
+              <span className="flex items-center gap-1"><span className="w-2 bg-rose-500 rounded-sm"></span> Sepi</span>
             </div>
           </div>
 
@@ -520,17 +591,49 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
           </div>
 
           <div className="flex justify-between text-xs text-slate-500 mt-2" id="login-highlight-footer">
-            <div>Aktivitas Terpadat: <span className="font-bold text-blue-700">Rabu (78 Logins)</span></div>
-            <div>Aktivitas Terendah: <span className="font-bold text-rose-600">Minggu (8 Logins)</span></div>
+            <div>Terpadat: <span className="font-bold text-blue-700">Rabu (78)</span></div>
+            <div>Terendah: <span className="font-bold text-rose-600">Minggu (8)</span></div>
+          </div>
+        </div>
+
+        {/* 5. Grafik Penyelesaian per Regional (Bar Chart) */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4 lg:col-span-1" id="chart-bar-regional-completions">
+          <div>
+            <h3 className="font-display font-medium text-slate-800 text-base">Penyelesaian per Regional</h3>
+            <p className="text-xs text-slate-400">Rata-rata persentase penyelesaian course per regional</p>
+          </div>
+
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={completionPerRegional}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
+                <XAxis dataKey="name" fontSize={10} stroke="#94a3b8" />
+                <YAxis fontSize={10} stroke="#94a3b8" unit="%" />
+                <Tooltip formatter={(value) => `${value}%`} />
+                <Bar dataKey="Persentase" fill="#3B82F6" radius={[4, 4, 0, 0]}>
+                  {completionPerRegional.map((entry, index) => {
+                    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+                    return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="flex justify-between items-center text-xs text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100" id="regional-summary-footer">
+            <span>Regional Tertinggi:</span>
+            <span className="font-bold text-emerald-600">Jatim 1 (92%)</span>
           </div>
         </div>
       </div>
+      </>
+      )}
 
-      {/* 👥 LIST MONITORING & MANAGEMENT */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6" id="admin-users-monitoring">
+      {activeTab === 'monitoring' && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6" id="admin-users-monitoring">
         
         {/* 🏆 Top Learner */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4" id="monitor-top-learners">
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4 xl:col-span-2" id="monitor-top-learners">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-display font-medium text-slate-800 text-lg flex items-center gap-2">
@@ -570,7 +673,7 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
                     <td className="py-3">
                       <div>
                         <div className="font-medium text-slate-800">{learner.name}</div>
-                        <div className="text-[10px] text-slate-400">{learner.division} • {learner.branch}</div>
+                        <div className="text-[10px] text-slate-400">{learner.division} • {learner.regional}</div>
                       </div>
                     </td>
                     <td className="py-3">
@@ -588,57 +691,6 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-
-        {/* 🚫 User Belum Pernah Login */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4" id="monitor-inactive-users">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h3 className="font-display font-medium text-slate-800 text-lg flex items-center gap-2">
-                <EyeOff className="w-5 h-5 text-slate-500" /> User Belum Pernah Login
-              </h3>
-              <p className="text-xs text-slate-400">Membantu menindaklanjuti proses onboarding karyawan baru</p>
-            </div>
-            
-            <div className="text-xs text-rose-500 font-mono bg-rose-50 px-2 py-1 border border-rose-100 rounded-md self-start">
-              {neverLoggedInUsers.length} Orang Belum Akses
-            </div>
-          </div>
-
-          <div className="overflow-y-auto max-h-76 divide-y divide-slate-100 border border-slate-50 rounded-xl" id="never-login-list-container">
-            {neverLoggedInUsers.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs">Semua user sudah pernah login.</div>
-            ) : (
-              neverLoggedInUsers.map(user => (
-                <div key={user.id} className="p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                  <div className="space-y-1">
-                    <div className="font-medium text-slate-800 text-sm">{user.name}</div>
-                    <div className="text-xs text-slate-400 flex flex-wrap gap-x-2 gap-y-0.5">
-                      <span>Cabang: <strong className="text-slate-600">{user.branch}</strong></span>
-                      <span>•</span>
-                      <span>Jabatan: <strong className="text-slate-600">{user.role}</strong></span>
-                    </div>
-                    <div className="text-[10px] text-slate-400 font-mono">
-                      Akun Dibuat: {user.dateCreated}
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-col items-end gap-1.5">
-                    <span className="text-[10px] uppercase font-mono tracking-wider text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded font-medium">
-                      Belum Login
-                    </span>
-                    
-                    <button 
-                      onClick={() => alert(`Mengirimkan email follow-up onboarding ke ${user.email}`)}
-                      className="text-[10px] font-medium text-indigo-600 hover:text-indigo-800 underline active:text-indigo-900 cursor-pointer"
-                    >
-                      Kirim Blast Email
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
           </div>
         </div>
 
@@ -663,7 +715,7 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
                       Modul: <span className="text-slate-700">{enroll.courseTitle}</span>
                     </div>
                     <div className="text-[10px] text-slate-400">
-                      Cabang: {enroll.branch} • Divisi: {enroll.division}
+                      Regional: {enroll.regional} • Divisi: {enroll.division}
                     </div>
                   </div>
 
@@ -720,7 +772,7 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
                 <div key={user.id} className="p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
                   <div>
                     <div className="font-medium text-slate-800">{user.name}</div>
-                    <div className="text-xs text-slate-400">{user.division} • {user.branch} • {user.role}</div>
+                    <div className="text-xs text-slate-400">{user.division} • {user.regional} • {user.role}</div>
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-100 font-medium">
@@ -734,12 +786,13 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
         </div>
 
       </div>
+      )}
 
-      {/* 📚 COURSE PERFORMANCE FRAME */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6" id="admin-course-performance-analysis">
+      {activeTab === 'courses' && (
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6" id="admin-course-performance-analysis">
         <div>
-          <h3 className="font-display font-medium text-slate-800 text-lg">Analisis Kinerja Course & Modul</h3>
-          <p className="text-xs text-slate-400">Informasi efektivitas, ketertarikan, dan tingkat kesulitan masing-masing modul</p>
+          <h3 className="font-display font-medium text-slate-800 text-lg">Analisis Kinerja Course</h3>
+          <p className="text-xs text-slate-400">Informasi efektivitas, ketertarikan, dan tingkat kesulitan masing-masing course</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="course-reports-grid">
@@ -815,42 +868,245 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
         <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100/80 space-y-4" id="average-completion-by-course">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
             <h4 className="text-sm font-semibold text-slate-800">📊 Rangkuman Average Completion Rate</h4>
-            <span className="text-xs text-slate-400">Evaluasi efisiensi modul instruksional</span>
+            <span className="text-xs text-slate-400">Evaluasi efisiensi course instruksional</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="average-completion-cards-row">
-            {coursePerformance.map(course => (
-              <div key={course.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-xs flex flex-col justify-between space-y-3">
-                <div className="space-y-1">
-                  <span className="text-[9px] font-mono px-2 py-0.5 bg-slate-50 text-slate-500 border border-slate-150 rounded-sm">
-                    {course.category}
-                  </span>
-                  <p className="font-medium text-xs text-slate-800 truncate" title={course.title}>{course.title}</p>
-                </div>
-                
-                <div className="space-y-1">
-                  <div className="flex justify-between items-baseline text-xs">
-                    <span className="text-slate-400 text-[10px]">Completion Rate:</span>
-                    <span className="font-bold text-slate-800 font-mono">{course.completionRate}%</span>
+            {coursePerformance.map(course => {
+              const isSelected = selectedCourseId === course.id;
+              return (
+                <div 
+                  key={course.id} 
+                  onClick={() => setSelectedCourseId(course.id)}
+                  className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
+                    isSelected 
+                      ? 'bg-blue-50/40 border-blue-500 shadow-xs ring-1 ring-blue-500/35 scale-[1.02]' 
+                      : 'bg-white border-slate-200 hover:border-blue-450 hover:shadow-xs hover:bg-slate-50/20'
+                  }`}
+                  title="Klik untuk melihat breakdown detail kuis & materi"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className={`text-[9px] font-mono px-2 py-0.5 rounded-sm border ${
+                        isSelected ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-slate-50 text-slate-500 border-slate-150'
+                      }`}>
+                        {course.category}
+                      </span>
+                      {isSelected && (
+                        <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                      )}
+                    </div>
+                    <p className="font-semibold text-xs text-slate-800 truncate" title={course.title}>{course.title}</p>
                   </div>
                   
-                  {/* Progress bar visual */}
-                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-blue-600 h-full rounded-full" 
-                      style={{ width: `${course.completionRate}%` }} 
-                    />
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-baseline text-xs">
+                      <span className="text-slate-400 text-[10px]">Completion Rate:</span>
+                      <span className="font-bold text-slate-800 font-mono">{course.completionRate}%</span>
+                    </div>
+                    
+                    {/* Progress bar visual */}
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-blue-600 h-full rounded-full" 
+                        style={{ width: `${course.completionRate}%` }} 
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="pt-1.5 border-t border-slate-100 text-[10px] text-center text-blue-600 font-medium flex items-center justify-center gap-1">
+                    <span>{isSelected ? 'Melihat Detail' : 'Klik untuk Detail'}</span>
+                    <ArrowUpRight className="w-3 h-3" />
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
-      </div>
+        {/* 📊 DETAIL BREAKDOWN DRILL-DOWN PANEL */}
+        {selectedCourseId && (
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6 animate-fade-in" id="course-drilldown-panel">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] uppercase font-mono font-bold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-sm border border-blue-100">
+                      {mockCourses.find(c => c.id === selectedCourseId)?.category}
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono">Course ID: {selectedCourseId}</span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-sans font-bold text-slate-900 mt-1">
+                    Analisis Breakdown Modul: {mockCourses.find(c => c.id === selectedCourseId)?.title}
+                  </h3>
+                </div>
+              </div>
+              
+              <div className="text-xs text-slate-500 bg-blue-50/50 p-2.5 rounded-xl border border-blue-100/50 self-start sm:self-center font-medium">
+                💡 <span className="text-blue-700 font-semibold">Interaktif:</span> Klik course di atas untuk menganalisis modul program lainnya.
+              </div>
+            </div>
 
-      {/* 📅 TIMELINE AKTIVITAS TERBARU */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4" id="admin-recent-timeline">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6" id="breakdown-components-grid">
+              {[
+                // Pre-test
+                {
+                  name: selectedCourseId === 'c1' ? 'Pre-test Higiene Dasar' :
+                        selectedCourseId === 'c2' ? 'Pre-test Asesmen Leadership' :
+                        selectedCourseId === 'c3' ? 'Pre-test Aturan Sanitasi' :
+                        'Pre-test Mindset Hospitality',
+                  type: 'Pre-test',
+                  targetHours: selectedCourseId === 'c1' ? 0.5 :
+                               selectedCourseId === 'c2' ? 1.0 :
+                               selectedCourseId === 'c3' ? 0.5 : 0.5,
+                  actualHours: selectedCourseId === 'c1' ? 0.4 :
+                               selectedCourseId === 'c2' ? 0.8 :
+                               selectedCourseId === 'c3' ? 0.6 : 0.4,
+                  status: 'Selesai',
+                  percentage: 100,
+                  avgScore: selectedCourseId === 'c1' ? 78 :
+                            selectedCourseId === 'c2' ? 65 :
+                            selectedCourseId === 'c3' ? 70 : 72,
+                  passingScore: 70,
+                  description: 'Mengukur pemahaman awal karyawan sebelum pelatihan dimulai.'
+                },
+                // Materi
+                {
+                  name: selectedCourseId === 'c1' ? 'Bahan Ajar: Kontaminasi & Bakteri' :
+                        selectedCourseId === 'c2' ? 'Bahan Ajar: Coaching & Teamwork' :
+                        selectedCourseId === 'c3' ? 'Bahan Ajar: SOP Sanitasi Dapur' :
+                        'Bahan Ajar: Handling Customer Complaint',
+                  type: 'Materi',
+                  targetHours: selectedCourseId === 'c1' ? 4.5 :
+                               selectedCourseId === 'c2' ? 6.0 :
+                               selectedCourseId === 'c3' ? 3.5 : 5.0,
+                  actualHours: selectedCourseId === 'c1' ? 4.8 :
+                               selectedCourseId === 'c2' ? 5.5 :
+                               selectedCourseId === 'c3' ? 3.2 : 5.2,
+                  status: 'Selesai',
+                  percentage: selectedCourseId === 'c1' ? 96 :
+                              selectedCourseId === 'c2' ? 82 :
+                              selectedCourseId === 'c3' ? 75 : 91,
+                  avgScore: null,
+                  passingScore: null,
+                  description: 'Pembelajaran materi inti menggunakan modul visual interaktif & video panduan.'
+                },
+                // Post-test
+                {
+                  name: selectedCourseId === 'c1' ? 'Post-test Sertifikasi Level 1' :
+                        selectedCourseId === 'c2' ? 'Post-test Keputusan Managerial' :
+                        selectedCourseId === 'c3' ? 'Post-test Standar Audit Kebersihan' :
+                        'Post-test Sertifikasi Pelayanan Prima',
+                  type: 'Post-test',
+                  targetHours: selectedCourseId === 'c1' ? 1.0 :
+                               selectedCourseId === 'c2' ? 1.5 :
+                               selectedCourseId === 'c3' ? 1.0 : 1.0,
+                  actualHours: selectedCourseId === 'c1' ? 0.9 :
+                               selectedCourseId === 'c2' ? 1.6 :
+                               selectedCourseId === 'c3' ? 0.9 : 1.1,
+                  status: 'Selesai',
+                  percentage: selectedCourseId === 'c1' ? 96 :
+                              selectedCourseId === 'c2' ? 82 :
+                              selectedCourseId === 'c3' ? 75 : 91,
+                  avgScore: selectedCourseId === 'c1' ? 88 :
+                            selectedCourseId === 'c2' ? 84 :
+                            selectedCourseId === 'c3' ? 81 : 86,
+                  passingScore: selectedCourseId === 'c1' ? 80 :
+                                selectedCourseId === 'c2' ? 75 :
+                                selectedCourseId === 'c3' ? 75 : 80,
+                  description: 'Ujian akhir komprehensif penentu kelayakan & penerbitan sertifikasi.'
+                }
+              ].map((comp, idx) => {
+                const actualPct = Math.round((comp.actualHours / comp.targetHours) * 100);
+                return (
+                  <div key={idx} className="bg-slate-50 p-5 rounded-2xl border border-slate-100 hover:border-slate-200 hover:shadow-xs transition-all flex flex-col justify-between space-y-4">
+                    
+                    {/* Component Header */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[9px] font-mono uppercase tracking-wider font-bold px-2 py-0.5 rounded border ${
+                          comp.type === 'Pre-test' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                          comp.type === 'Materi' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}>
+                          {comp.type}
+                        </span>
+                        
+                        <span className="text-[11px] font-mono font-medium text-slate-500 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          Durasi: {actualPct}%
+                        </span>
+                      </div>
+                      
+                      <h4 className="font-sans font-bold text-slate-800 text-sm leading-tight">
+                        {comp.name}
+                      </h4>
+                      <p className="text-xs text-slate-400 leading-normal">
+                        {comp.description}
+                      </p>
+                    </div>
+
+                    {/* Hours Breakdown */}
+                    <div className="bg-white p-4 rounded-xl border border-slate-150 space-y-2.5">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-400 font-medium">Target Learning Hour:</span>
+                        <span className="font-mono font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-150">{comp.targetHours} Jam</span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-400 font-medium">Actual Learning Hour:</span>
+                        <span className="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-150">{comp.actualHours} Jam</span>
+                      </div>
+
+                      {/* Progress Visual */}
+                      <div className="space-y-1 pt-1">
+                        <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                          <span>Rasio Target &amp; Realisasi</span>
+                          <span className="font-mono">{comp.actualHours}h / {comp.targetHours}h</span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all ${
+                              comp.actualHours >= comp.targetHours ? 'bg-emerald-500' : 'bg-blue-500'
+                            }`} 
+                            style={{ width: `${Math.min(100, actualPct)}%` }} 
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Component Outcome / Performance Score */}
+                    <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                      <span className="text-xs text-slate-450 font-medium">Indikator Hasil:</span>
+                      <div className="flex items-center gap-2">
+                        {comp.avgScore !== null ? (
+                          <div className="text-right">
+                            <div className="text-xs font-bold text-slate-800 font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-sans">Rerata: {comp.avgScore}%</div>
+                            <div className="text-[9px] text-emerald-600 font-mono font-bold mt-0.5">Passing: {comp.passingScore}%</div>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-bold text-emerald-650 bg-emerald-50/70 text-emerald-700 px-2.5 py-1 rounded border border-emerald-250 font-mono">
+                            Tuntas {comp.percentage}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+      </div>
+      )}
+
+      {activeTab === 'overview' && (
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4" id="admin-recent-timeline">
         <div>
           <h3 className="font-display font-medium text-slate-800 text-lg">📅 Aktivitas Terbaru</h3>
           <p className="text-xs text-slate-400">Log operasional real-time di seluruh infrastruktur LMS</p>
@@ -882,6 +1138,7 @@ export default function AdminDashboard({ filters }: AdminDashboardProps) {
           ))}
         </div>
       </div>
+      )}
 
     </div>
   );

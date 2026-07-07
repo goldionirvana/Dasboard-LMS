@@ -47,7 +47,6 @@ export default function ManagerDashboard({ filters }: ManagerDashboardProps) {
       // By default, a manager views coworkers/subordinates. Let's exclude " u4 Dedi " (who is the manager) to make the team 13 people!
       if (user.id === 'u4') return false; 
       
-      if (filters.branch !== 'all' && user.branch !== filters.branch) return false;
       if (filters.division !== 'all' && user.division !== filters.division) return false;
       if (filters.area !== 'all' && user.area !== filters.area) return false;
       if (filters.regional !== 'all' && user.regional !== filters.regional) return false;
@@ -219,17 +218,27 @@ export default function ManagerDashboard({ filters }: ManagerDashboardProps) {
   }, [teamUsers, teamEnrollments]);
 
   // 4. CHARTS DESIGN
-  // Completion per branch
-  const completionPerBranch = useMemo(() => {
-    const branches: ('Malang' | 'Garut' | 'Bandung')[] = ['Malang', 'Garut', 'Bandung'];
-    return branches.map(b => {
-      const bUsers = mockUsers.filter(u => u.branch === b && u.id !== 'u4');
-      const bEnrolls = mockEnrollments.filter(e => bUsers.some(u => u.id === e.userId));
-      const finished = bEnrolls.filter(e => e.status === 'Completed').length;
-      const rate = bEnrolls.length > 0 ? Math.round((finished / bEnrolls.length) * 100) : 80; // default baseline fallback
+  // Completion per regional
+  const completionPerRegional = useMemo(() => {
+    const regionals: ('Jabar 1' | 'Jabar 2' | 'Jatim 1' | 'Jatim 2' | 'Kalimantan 1')[] = [
+      'Jabar 1', 'Jabar 2', 'Jatim 1', 'Jatim 2', 'Kalimantan 1'
+    ];
+    return regionals.map(reg => {
+      const regUsers = mockUsers.filter(u => u.regional === reg && u.id !== 'u4');
+      const regEnrolls = mockEnrollments.filter(e => regUsers.some(u => u.id === e.userId));
+      const finished = regEnrolls.filter(e => e.status === 'Completed').length;
+      let rate = regEnrolls.length > 0 ? Math.round((finished / regEnrolls.length) * 100) : 0;
+      
+      if (regEnrolls.length === 0) {
+        if (reg === 'Jabar 1') rate = 85;
+        else if (reg === 'Jabar 2') rate = 78;
+        else if (reg === 'Jatim 1') rate = 92;
+        else if (reg === 'Jatim 2') rate = 80;
+        else rate = 75;
+      }
 
       return {
-        name: b,
+        name: reg,
         Persentase: rate
       };
     });
@@ -266,7 +275,7 @@ export default function ManagerDashboard({ filters }: ManagerDashboardProps) {
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-2">
             <Users className="w-3.5 h-3.5 text-blue-500" />
-            <span>Tersebar di {filters.branch === 'all' ? '3 Cabang' : filters.branch}</span>
+            <span>Tersebar di {filters.area === 'all' ? 'Seluruh Area' : `${filters.area} Area`}</span>
           </div>
         </div>
 
@@ -521,26 +530,27 @@ export default function ManagerDashboard({ filters }: ManagerDashboardProps) {
       {/* 📈 COMPILATION BAR CHARTS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" id="manager-bar-charts">
         
-        {/* Completion per Cabang */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm col-span-1 space-y-4" id="chart-branch-completion">
+        {/* Completion per Regional */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm col-span-1 space-y-4" id="chart-regional-completion">
           <div>
             <h3 className="font-display font-medium text-slate-800 text-base flex items-center gap-2">
-              <MapPin className="w-4.5 h-4.5 text-slate-500" /> Completion per Cabang (%)
+              <MapPin className="w-4.5 h-4.5 text-slate-500" /> Completion per Regional (%)
             </h3>
-            <p className="text-xs text-slate-400">Rata-rata penyelesaian modul di tiap cabang</p>
+            <p className="text-xs text-slate-400">Rata-rata penyelesaian modul di tiap regional</p>
           </div>
 
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={completionPerBranch} layout="vertical">
+              <BarChart data={completionPerRegional} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                 <XAxis type="number" domain={[0, 100]} fontSize={10} stroke="#94a3b8" />
-                <YAxis dataKey="name" type="category" fontSize={10} stroke="#94a3b8" width={60} />
+                <YAxis dataKey="name" type="category" fontSize={10} stroke="#94a3b8" width={80} />
                 <Tooltip formatter={(value) => `${value}%`} />
                 <Bar dataKey="Persentase" fill="#F59E0B" radius={[0, 4, 4, 0]} maxBarSize={20}>
-                  {completionPerBranch.map((entry, idx) => (
-                    <Cell key={`cell-${idx}`} fill={entry.name === 'Malang' ? '#F59E0B' : entry.name === 'Garut' ? '#10B981' : '#3B82F6'} />
-                  ))}
+                  {completionPerRegional.map((entry, idx) => {
+                    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+                    return <Cell key={`cell-${idx}`} fill={colors[idx % colors.length]} />;
+                  })}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -601,82 +611,6 @@ export default function ManagerDashboard({ filters }: ManagerDashboardProps) {
                   <div className="text-xs font-mono font-bold text-slate-800">{person.score} <span className="text-[9px] font-normal text-slate-400">/100</span></div>
                   <div className="text-[9px] text-slate-400 font-mono">Quiz Avg</div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* 📊 HEATMAP PROGRESS GRID */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4" id="manager-progress-heatmap">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-display font-medium text-slate-800 text-lg flex items-center gap-2">
-              <Grid className="w-5 h-5 text-blue-500" /> Heatmap Progress Belajar
-            </h3>
-            <p className="text-xs text-slate-400">Visualisasi distribusi penyelesaian modul tiap anggota tim berdasarkan course</p>
-          </div>
-
-          <div className="flex items-center gap-3 text-[10px] font-mono bg-slate-50 px-3 py-1 text-slate-600 rounded-lg border border-slate-100">
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-slate-150 rounded-xs" /> Not Started</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-blue-100 rounded-xs" /> Under 30%</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-blue-350 rounded-xs" /> 30-80%</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-blue-600 rounded-xs" /> Completed</span>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto" id="heatmap-grid-scroll-wrapper">
-          <div className="min-w-160 grid grid-cols-5 bg-slate-50 p-2.5 rounded-xl border border-slate-100 gap-2" id="heatmap-head">
-            <div className="font-bold text-xs text-slate-600 px-2 flex items-center">Nama Karyawan</div>
-            {mockCourses.map(course => (
-              <div key={course.id} className="font-semibold text-[10px] text-slate-600 text-center leading-tight">
-                <div className="truncate" title={course.title}>{course.title}</div>
-                <div className="text-[9px] font-mono text-slate-400 mt-0.5 uppercase tracking-wide">{course.category}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="min-w-160 divide-y divide-slate-100 border border-slate-100 rounded-xl mt-3 bg-white" id="heatmap-body">
-            {teamUsers.map(user => (
-              <div key={user.id} className="grid grid-cols-5 p-2.5 items-center hover:bg-slate-50/50 transition-colors">
-                <div className="px-2">
-                  <div className="font-semibold text-xs text-slate-800">{user.name}</div>
-                  <div className="text-[9px] text-slate-400">{user.role} • {user.branch}</div>
-                </div>
-
-                {mockCourses.map(course => {
-                  const enroll = mockEnrollments.find(e => e.userId === user.id && e.courseId === course.id);
-                  const progress = enroll ? enroll.progress : 0;
-                  const isCompleted = enroll?.status === 'Completed';
-
-                  // Heatmap color logic
-                  let bg = 'bg-slate-100 text-slate-400'; // Not Started
-                  let text = 'text-slate-400';
-                  
-                  if (enroll) {
-                    if (isCompleted) {
-                      bg = 'bg-blue-600 text-white';
-                    } else if (progress < 30) {
-                      bg = 'bg-blue-100 text-blue-800';
-                    } else {
-                      bg = 'bg-blue-200 text-blue-900';
-                    }
-                  }
-
-                  return (
-                    <div key={course.id} className="p-1 flex items-center justify-center">
-                      <div className={`w-full py-3 px-1.5 rounded-lg flex flex-col items-center justify-center font-mono text-[10px] font-bold ${bg} transition-all hover:scale-103 shadow-2xs`}>
-                        <div>{progress}%</div>
-                        {enroll && enroll.quizScore !== null && (
-                          <div className="text-[8px] font-medium opacity-90 mt-0.5">Quiz: {enroll.quizScore}</div>
-                        )}
-                        {!enroll && (
-                          <div className="text-[8px] font-medium opacity-60 mt-0.5">-</div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
               </div>
             ))}
           </div>
