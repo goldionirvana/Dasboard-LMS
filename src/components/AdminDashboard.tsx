@@ -25,8 +25,12 @@ import {
   Target,
   ArrowDownRight,
   ShieldCheck,
-  Compass
+  Compass,
+  Download,
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -69,6 +73,78 @@ export default function AdminDashboard({ filters, onViewKHS }: AdminDashboardPro
   const [searchQuery, setSearchQuery] = useState('');
   const [newUserTimeframe, setNewUserTimeframe] = useState<7 | 30>(30);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>('c1');
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+
+  const handleExportExcel = () => {
+    const summaryData = [
+      { Kategori: 'Total User Terdaftar', Nilai: stats.totalUsers, Keterangan: 'Total kru harian dan staf terdaftar' },
+      { Kategori: 'Pengguna Aktif Hari Ini', Nilai: stats.activeToday, Keterangan: 'Jumlah user login pada hari ini' },
+      { Kategori: 'Total Materi (Course)', Nilai: stats.totalCourses, Keterangan: 'Materi pembelajaran aktif' },
+      { Kategori: 'Total Penugasan (Enrollments)', Nilai: stats.totalEnrollments, Keterangan: 'Total pendaftaran kelas' },
+      { Kategori: 'Tingkat Kelulusan (%)', Nilai: `${stats.completionRate}%`, Keterangan: 'Persentase kelas diselesaikan' },
+      { Kategori: 'Rata-rata Nilai Quiz', Nilai: stats.averageQuizScore, Keterangan: 'Rata-rata skor evaluasi quiz' },
+      { Kategori: 'Sertifikat Diterbitkan', Nilai: stats.certificatesCount, Keterangan: 'Total sertifikat kelulusan' }
+    ];
+
+    const activeFilters = [
+      { Parameter: 'Tanggal Mulai', Nilai: filters.startDate || 'Semua' },
+      { Parameter: 'Tanggal Selesai', Nilai: filters.endDate || 'Semua' },
+      { Parameter: 'Area', Nilai: filters.area },
+      { Parameter: 'Regional', Nilai: filters.regional },
+      { Parameter: 'Divisi', Nilai: filters.division },
+      { Parameter: 'Kategori Course', Nilai: filters.category }
+    ];
+
+    const usersSheetData = filteredUsers.map(u => ({
+      'ID User': u.id,
+      'Nama Lengkap': u.name,
+      'Email': u.email,
+      'Divisi / Departemen': u.division,
+      'Regional': u.regional,
+      'Area': u.area,
+      'Peran': u.role,
+      'Tanggal Pendaftaran': u.dateCreated,
+      'Terakhir Login': u.lastLogin || 'Belum Pernah Login',
+      'Jam Belajar': u.learningHours,
+      'Status': u.status
+    }));
+
+    const enrollmentSheetData = filteredEnrollments.map(e => ({
+      'ID Enrollment': e.id,
+      'Nama Pengguna': e.userName,
+      'Divisi': e.userDivision,
+      'Regional': e.userRegional,
+      'Area': e.userArea,
+      'Judul Materi': e.courseTitle,
+      'Progress (%)': e.progress,
+      'Status Kelulusan': e.status,
+      'Skor Quiz': e.quizScore !== null ? e.quizScore : 'N/A',
+      'Durasi Belajar (Jam)': e.learningHours,
+      'Tenggat Waktu (Deadline)': e.deadline
+    }));
+
+    const wb = XLSX.utils.book_new();
+
+    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Ringkasan Eksekutif');
+
+    const wsFilters = XLSX.utils.json_to_sheet(activeFilters);
+    XLSX.utils.book_append_sheet(wb, wsFilters, 'Filter yang Diterapkan');
+
+    const wsUsers = XLSX.utils.json_to_sheet(usersSheetData);
+    XLSX.utils.book_append_sheet(wb, wsUsers, 'Data Pengguna');
+
+    const wsEnroll = XLSX.utils.json_to_sheet(enrollmentSheetData);
+    XLSX.utils.book_append_sheet(wb, wsEnroll, 'Detail Pelatihan');
+
+    XLSX.writeFile(wb, `LMS_Analytics_Dashboard_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+    setIsExportDropdownOpen(false);
+  };
+
+  const handleExportPDF = () => {
+    window.print();
+    setIsExportDropdownOpen(false);
+  };
 
   // 1. DYNAMIC DATA FILTERING & COMPUTATION
   const filteredUsers = useMemo(() => {
@@ -92,9 +168,14 @@ export default function AdminDashboard({ filters, onViewKHS }: AdminDashboardPro
         const course = mockCourses.find(c => c.id === enroll.courseId);
         if (!course || course.category !== filters.category) return false;
       }
+
+      // Date range filter
+      if (filters.startDate && enroll.deadline < filters.startDate) return false;
+      if (filters.endDate && enroll.deadline > filters.endDate) return false;
+
       return true;
     });
-  }, [filteredUserIds, filters.category]);
+  }, [filteredUserIds, filters.category, filters.startDate, filters.endDate]);
 
   const filteredCourses = useMemo(() => {
     if (filters.category === 'all') return mockCourses;
@@ -296,54 +377,98 @@ export default function AdminDashboard({ filters, onViewKHS }: AdminDashboardPro
     <div className="space-y-8 pb-12 animate-fade-in" id="admin-dashboard-container">
       
       {/* 📑 SUBMENU SELECTOR */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-150 pb-3 mb-2" id="admin-submenu-selector">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-            activeTab === 'overview'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
-        >
-          <BarChart4 className="w-4 h-4" />
-          <span>Ringkasan &amp; Analitik</span>
-        </button>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-150 pb-3 mb-2 print:hidden" id="admin-submenu-selector">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === 'overview'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+            }`}
+          >
+            <BarChart4 className="w-4 h-4" />
+            <span>Ringkasan &amp; Analitik</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('courses')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-            activeTab === 'courses'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
-        >
-          <BookOpen className="w-4 h-4" />
-          <span>Kinerja Materi (Course)</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('courses')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === 'courses'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Kinerja Materi (Course)</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('monitoring')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-            activeTab === 'monitoring'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Pengawasan Belajar (Learners)</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('monitoring')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === 'monitoring'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Pengawasan Belajar (Learners)</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('program_review')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-            activeTab === 'program_review'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
-        >
-          <Compass className="w-4 h-4" />
-          <span>Analisis Program Berjalan</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('program_review')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === 'program_review'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+            }`}
+          >
+            <Compass className="w-4 h-4" />
+            <span>Analisis Program Berjalan</span>
+          </button>
+        </div>
+
+        {/* 📥 EXPORT DROPDOWN ACTION */}
+        <div className="relative self-end md:self-auto" id="export-dropdown-wrapper">
+          <button
+            onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/10 transition-all cursor-pointer"
+            id="btn-export-dropdown-toggle"
+          >
+            <Download className="w-4 h-4" />
+            <span>Ekspor Laporan</span>
+          </button>
+
+          {isExportDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden divide-y divide-slate-100 animate-slide-down" id="export-dropdown-menu">
+              <div className="p-2.5 text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider bg-slate-50">Pilih Format Ekspor</div>
+              
+              <button
+                onClick={handleExportExcel}
+                className="w-full text-left flex items-center gap-3 px-4 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-emerald-700 transition-colors cursor-pointer"
+                id="btn-export-excel"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                <div>
+                  <span className="block font-sans">Ekspor ke Excel (.xlsx)</span>
+                  <span className="block font-sans text-[10px] text-slate-400 font-normal">Multi-tab ringkasan & data detail</span>
+                </div>
+              </button>
+
+              <button
+                onClick={handleExportPDF}
+                className="w-full text-left flex items-center gap-3 px-4 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-700 transition-colors cursor-pointer"
+                id="btn-export-pdf"
+              >
+                <FileText className="w-4 h-4 text-blue-600" />
+                <div>
+                  <span className="block font-sans">Unduh Laporan PDF (.pdf)</span>
+                  <span className="block font-sans text-[10px] text-slate-400 font-normal">Cetak dokumen eksekutif A4</span>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {activeTab === 'overview' && (
@@ -1179,6 +1304,158 @@ export default function AdminDashboard({ filters, onViewKHS }: AdminDashboardPro
           <SOCDashboard onViewKHS={onViewKHS} />
         </div>
       )}
+
+      {/* 🖨️ PRINT-ONLY EXECUTIVE SUMMARY REPORT CONTAINER */}
+      <div className="hidden print:block bg-white text-slate-900 p-8 space-y-8" id="print-report-container">
+        {/* Header Block */}
+        <div className="flex justify-between items-center border-b pb-6">
+          <div>
+            <h1 className="text-2xl font-bold font-sans tracking-tight">LAPORAN OPERASIONAL KINERJA PEMBELAJARAN (LMS)</h1>
+            <p className="text-xs text-slate-500 font-mono uppercase">LMS Analytics Hub • Executive Management Report</p>
+          </div>
+          <div className="text-right text-xs font-mono space-y-1">
+            <p>Tanggal Cetak: {new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB</p>
+            <p>Petugas: nirvanagoldio@gmail.com</p>
+            <p className="font-semibold text-rose-700">KLASIFIKASI: RAHASIA PERUSAHAAN</p>
+          </div>
+        </div>
+
+        {/* Filters Summary Card */}
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+          <h3 className="text-xs font-bold font-mono uppercase text-slate-500">Filter Analisis Terapan</h3>
+          <div className="grid grid-cols-3 gap-y-2 gap-x-4 text-xs font-medium">
+            <div><span className="text-slate-400 font-normal">Tanggal Mulai:</span> <strong>{filters.startDate || 'Semua Waktu'}</strong></div>
+            <div><span className="text-slate-400 font-normal">Tanggal Selesai:</span> <strong>{filters.endDate || 'Semua Waktu'}</strong></div>
+            <div><span className="text-slate-400 font-normal">Area Operasional:</span> <strong>{filters.area === 'all' ? 'Semua' : filters.area}</strong></div>
+            <div><span className="text-slate-400 font-normal">Regional:</span> <strong>{filters.regional === 'all' ? 'Semua' : filters.regional}</strong></div>
+            <div><span className="text-slate-400 font-normal">Divisi / Departemen:</span> <strong>{filters.division === 'all' ? 'Semua' : filters.division}</strong></div>
+            <div><span className="text-slate-400 font-normal">Kategori Materi:</span> <strong>{filters.category === 'all' ? 'Semua' : filters.category}</strong></div>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-3 gap-4" id="print-stats-grid">
+          <div className="border p-4 rounded-xl space-y-1 bg-slate-50/50">
+            <p className="text-[10px] font-mono uppercase text-slate-450 font-bold">Total User Terdaftar</p>
+            <h3 className="text-2xl font-bold font-sans text-slate-900">{stats.totalUsers}</h3>
+            <p className="text-[10px] text-slate-500">Kru harian dan staf kantor</p>
+          </div>
+          <div className="border p-4 rounded-xl space-y-1 bg-slate-50/50">
+            <p className="text-[10px] font-mono uppercase text-slate-450 font-bold">User Aktif Hari Ini</p>
+            <h3 className="text-2xl font-bold font-sans text-slate-900">{stats.activeToday}</h3>
+            <p className="text-[10px] text-slate-500">Sesi logins tanggal berjalan</p>
+          </div>
+          <div className="border p-4 rounded-xl space-y-1 bg-slate-50/50">
+            <p className="text-[10px] font-mono uppercase text-slate-450 font-bold">Total Course / Enrolls</p>
+            <h3 className="text-2xl font-bold font-sans text-slate-900">{stats.totalCourses} / {stats.totalEnrollments}</h3>
+            <p className="text-[10px] text-slate-500">Materi rilis vs penugasan</p>
+          </div>
+          <div className="border p-4 rounded-xl space-y-1 bg-slate-50/50">
+            <p className="text-[10px] font-mono uppercase text-slate-450 font-bold">Sertifikat Terbit</p>
+            <h3 className="text-2xl font-bold font-sans text-emerald-700">{stats.certificatesCount}</h3>
+            <p className="text-[10px] text-slate-500">Pelatihan selesai kelayakan</p>
+          </div>
+          <div className="border p-4 rounded-xl space-y-1 bg-slate-50/50">
+            <p className="text-[10px] font-mono uppercase text-slate-450 font-bold">Avg Completion Rate</p>
+            <h3 className="text-2xl font-bold font-sans text-blue-650">{stats.completionRate}%</h3>
+            <p className="text-[10px] text-slate-500">Rasio penugasan diselesaikan</p>
+          </div>
+          <div className="border p-4 rounded-xl space-y-1 bg-slate-50/50">
+            <p className="text-[10px] font-mono uppercase text-slate-450 font-bold">Rata-rata Nilai Quiz</p>
+            <h3 className="text-2xl font-bold font-sans text-blue-650">{stats.averageQuizScore} / 100</h3>
+            <p className="text-[10px] text-slate-500">Skor evaluasi uji pemahaman</p>
+          </div>
+        </div>
+
+        {/* Popular Courses Section Table */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold tracking-tight text-slate-900 border-b pb-1">1. Kinerja Materi Pembelajaran Terpopuler</h3>
+          <table className="w-full text-xs text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-100 font-semibold text-slate-700">
+                <th className="p-2 border">Judul Materi (Course Title)</th>
+                <th className="p-2 border">Kategori</th>
+                <th className="p-2 border text-center">Total Enrolls</th>
+                <th className="p-2 border text-center">Tingkat Kelulusan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {popularCourses.slice(0, 5).map(c => (
+                <tr key={c.id} className="border-b">
+                  <td className="p-2 border font-semibold text-slate-800">{c.title}</td>
+                  <td className="p-2 border text-slate-500">{c.category}</td>
+                  <td className="p-2 border text-center">{c.enrollmentCount}</td>
+                  <td className="p-2 border text-center font-bold text-slate-950">{c.completionRate}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Learners Summary Section Table */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold tracking-tight text-slate-900 border-b pb-1">2. Daftar Status Pelatihan Karyawan (Sampel Terbaru)</h3>
+          <table className="w-full text-xs text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-100 font-semibold text-slate-700">
+                <th className="p-2 border">Nama Karyawan</th>
+                <th className="p-2 border">Materi Pembelajaran</th>
+                <th className="p-2 border text-center">Status</th>
+                <th className="p-2 border text-center">Skor Quiz</th>
+                <th className="p-2 border text-center">Tenggat Waktu</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEnrollments.slice(0, 15).map(e => (
+                <tr key={e.id} className="border-b">
+                  <td className="p-2 border font-medium text-slate-800">{e.userName} ({e.userDivision})</td>
+                  <td className="p-2 border text-slate-500">{e.courseTitle}</td>
+                  <td className="p-2 border text-center">
+                    <span className={`font-semibold ${
+                      e.status === 'Completed' ? 'text-emerald-700' :
+                      e.status === 'In Progress' ? 'text-blue-600' :
+                      e.status === 'Overdue' ? 'text-rose-600' : 'text-slate-500'
+                    }`}>{e.status}</span>
+                  </td>
+                  <td className="p-2 border text-center font-mono font-medium">{e.quizScore !== null ? e.quizScore : 'N/A'}</td>
+                  <td className="p-2 border text-center font-mono text-slate-500">{e.deadline}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer Signoff */}
+        <div className="pt-8 border-t flex justify-between text-[10px] text-slate-400 font-mono">
+          <p>Laporan ini digenerate secara otomatis oleh sistem LMS Analytics Suite.</p>
+          <p>© 2026 LMS Analytics Hub • All rights reserved</p>
+        </div>
+      </div>
+
+      {/* 🔮 CUSTOM PRINT MEDIA STYLES */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #print-report-container, #print-report-container * {
+            visibility: visible;
+          }
+          #print-report-container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            background: white !important;
+            color: black !important;
+          }
+          /* Remove header/footer margin noise on print pages */
+          @page {
+            size: A4 portrait;
+            margin: 1.5cm;
+          }
+        }
+      `}</style>
 
     </div>
   );

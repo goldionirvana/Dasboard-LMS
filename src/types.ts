@@ -90,7 +90,8 @@ export interface TeamMember {
 export type DashboardRole = 'admin' | 'manager' | 'trainer';
 
 export interface FilterState {
-  periode: 'all' | 'today' | '7days' | '30days';
+  startDate: string;
+  endDate: string;
   area: 'all' | 'East' | 'West';
   regional: 'all' | 'Jabar 1' | 'Jabar 2' | 'Jatim 1' | 'Jatim 2' | 'Kalimantan 1';
   division: 'all' | 'Kitchen' | 'Service' | 'Warehouse' | 'Management';

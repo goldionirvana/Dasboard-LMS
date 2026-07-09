@@ -5,8 +5,6 @@
 
 import React, { useState } from 'react';
 import { 
-  ShieldCheck, 
-  UserCheck, 
   GraduationCap, 
   Filter, 
   RefreshCcw, 
@@ -22,20 +20,18 @@ import {
   Search,
   BookOpen
 } from 'lucide-react';
-import { DashboardRole, FilterState } from './types';
+import { FilterState } from './types';
 import AdminDashboard from './components/AdminDashboard';
-import ManagerDashboard from './components/ManagerDashboard';
-import TrainerDashboard from './components/TrainerDashboard';
 import KHSDashboard from './components/KHSDashboard';
 
 export default function App() {
-  const [activeRole, setActiveRole] = useState<DashboardRole>('admin');
   const [selectedKHSName, setSelectedKHSName] = useState<string | null>(null);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
   
   // Initialize filter state with Indonesia-oriented defaults
   const [filters, setFilters] = useState<FilterState>({
-    periode: 'all',
+    startDate: '',
+    endDate: '',
     area: 'all',
     regional: 'all',
     division: 'all',
@@ -51,7 +47,8 @@ export default function App() {
 
   const resetFilters = () => {
     setFilters({
-      periode: 'all',
+      startDate: '',
+      endDate: '',
       area: 'all',
       regional: 'all',
       division: 'all',
@@ -60,7 +57,10 @@ export default function App() {
   };
 
   // Determine active filter badges count
-  const activeFiltersCount = Object.values(filters).filter(v => v !== 'all').length;
+  const activeFiltersCount = Object.entries(filters).filter(([key, val]) => {
+    if (key === 'startDate' || key === 'endDate') return val !== '';
+    return val !== 'all';
+  }).length;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 font-sans antialiased text-sm">
@@ -125,58 +125,7 @@ export default function App() {
             </p>
           </div>
 
-          {/* 🎯 USER MULTI-ROLE SWITCHER */}
-          <div className="pt-2 relative z-10 flex flex-col md:flex-row gap-3 items-start md:items-center justify-between" id="role-selector-container">
-            <div className="text-xs font-semibold text-slate-500">
-              Pilih Peran Analytics:
-            </div>
 
-            <div className="bg-slate-50 p-1 rounded-xl border border-slate-200/80 flex flex-wrap gap-1.5 w-full md:w-auto" id="switcher-panel">
-              
-              {/* Admin Selector */}
-              <button
-                onClick={() => setActiveRole('admin')}
-                className={`flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  activeRole === 'admin' 
-                    ? 'bg-blue-600 text-white shadow-xs' 
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                }`}
-                id="select-role-admin"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Dashboard Admin</span>
-              </button>
-
-              {/* Manager Selector */}
-              <button
-                onClick={() => setActiveRole('manager')}
-                className={`flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  activeRole === 'manager' 
-                    ? 'bg-blue-600 text-white shadow-xs' 
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                }`}
-                id="select-role-manager"
-              >
-                <UserCheck className="w-4 h-4" />
-                <span>Dashboard Manager</span>
-              </button>
-
-              {/* Trainer Selector */}
-              <button
-                onClick={() => setActiveRole('trainer')}
-                className={`flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  activeRole === 'trainer' 
-                    ? 'bg-blue-600 text-white shadow-xs' 
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                }`}
-                id="select-role-trainer"
-              >
-                <GraduationCap className="w-4 h-4" />
-                <span>Dashboard Trainer</span>
-              </button>
-
-            </div>
-          </div>
         </div>
 
         {/* 🛠️ LIVE FILTER CONTROLLER */}
@@ -223,21 +172,33 @@ export default function App() {
           {isFilterPanelOpen && (
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-down" id="filters-fields-grid">
               
-              {/* Periode */}
-              <div className="space-y-1.5" id="field-periode">
+              {/* Periode Evaluasi (Tanggal Range) */}
+              <div className="space-y-1.5 col-span-1" id="field-periode-range">
                 <label className="text-xs font-mono font-bold text-slate-400 uppercase flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-slate-400" /> Periode Evaluasi
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" /> Periode Evaluasi (Tanggal Range)
                 </label>
-                <select
-                  value={filters.periode}
-                  onChange={(e) => handleFilterChange('periode', e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500 focus:outline-hidden transition-all text-slate-700"
-                >
-                  <option value="all">Semua Waktu (All Time)</option>
-                  <option value="today">Hari Ini (Today)</option>
-                  <option value="7days">7 Hari Terakhir (Last 7 Days)</option>
-                  <option value="30days">30 Hari Terakhir (Last 30 Days)</option>
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={filters.startDate}
+                      onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500 focus:outline-hidden transition-all text-slate-700 font-medium"
+                      id="filter-start-date"
+                    />
+                    <span className="absolute right-2 top-2.5 text-[8px] font-mono text-slate-400 uppercase pointer-events-none">Mulai</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={filters.endDate}
+                      onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500 focus:outline-hidden transition-all text-slate-700 font-medium"
+                      id="filter-end-date"
+                    />
+                    <span className="absolute right-2 top-2.5 text-[8px] font-mono text-slate-400 uppercase pointer-events-none">Selesai</span>
+                  </div>
+                </div>
               </div>
 
               {/* Cabang */}
@@ -323,6 +284,20 @@ export default function App() {
             ) : (
               <div className="flex flex-wrap gap-1.5" id="active-badges-list">
                 {Object.entries(filters).map(([key, val]) => {
+                  if (key === 'startDate' || key === 'endDate') {
+                    if (val === '') return null;
+                    return (
+                      <span 
+                        key={key}
+                        onClick={() => handleFilterChange(key as keyof FilterState, '')}
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-mono text-[10px] font-semibold bg-blue-50 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-100 border border-blue-200 text-blue-700 transition-colors cursor-pointer"
+                      >
+                        <span className="text-slate-400">{key === 'startDate' ? 'Mulai' : 'Selesai'}:</span>
+                        <strong>{val}</strong>
+                        <span className="font-sans font-bold leading-none">&times;</span>
+                      </span>
+                    );
+                  }
                   if (val === 'all') return null;
                   return (
                     <span 
@@ -330,7 +305,7 @@ export default function App() {
                       onClick={() => handleFilterChange(key as keyof FilterState, 'all')}
                       className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-mono text-[10px] font-semibold bg-blue-50 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-100 border border-blue-200 text-blue-700 transition-colors cursor-pointer"
                     >
-                      <span className="text-slate-400">{key}:</span>
+                      <span className="text-slate-400">{key === 'division' ? 'divisi' : key === 'category' ? 'kategori' : key}:</span>
                       <strong>{val}</strong>
                       <span className="font-sans font-bold leading-none">&times;</span>
                     </span>
@@ -351,11 +326,7 @@ export default function App() {
               onBack={() => setSelectedKHSName(null)} 
             />
           ) : (
-            <>
-              {activeRole === 'admin' && <AdminDashboard filters={filters} onViewKHS={setSelectedKHSName} />}
-              {activeRole === 'manager' && <ManagerDashboard filters={filters} onViewKHS={setSelectedKHSName} />}
-              {activeRole === 'trainer' && <TrainerDashboard filters={filters} onViewKHS={setSelectedKHSName} />}
-            </>
+            <AdminDashboard filters={filters} onViewKHS={setSelectedKHSName} />
           )}
         </div>
 
